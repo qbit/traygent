@@ -1,0 +1,5 @@
+.direnv
+*.bak
+result
+traygent
+tags
