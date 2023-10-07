@@ -352,13 +352,13 @@ func (t *Traygent) Resize() {
 
 func (t *Traygent) Add(key agent.AddedKey) error {
 	fmt.Println("Add")
-	t.mu.Lock()
 
 	signer, err := ssh.NewSignerFromKey(key.PrivateKey)
 	if err != nil {
 		return err
 	}
 
+	t.mu.Lock()
 	p := NewPrivKey(signer, key)
 
 	t.keys = append(t.keys, p)
@@ -372,12 +372,12 @@ func (t *Traygent) Add(key agent.AddedKey) error {
 
 func (t *Traygent) RemoveAll() error {
 	fmt.Println("RemoveAll")
-	t.mu.Lock()
 
 	if t.locked {
 		return errLocked
 	}
 
+	t.mu.Lock()
 	t.keys = nil
 
 	t.log("All keys removed", "removed all keys from agent")
@@ -390,18 +390,17 @@ func (t *Traygent) RemoveAll() error {
 
 func (t *Traygent) Remove(key ssh.PublicKey) error {
 	fmt.Println("Remove")
-	t.mu.Lock()
 
 	if t.locked {
 		return errLocked
 	}
 
+	t.mu.Lock()
 	err := t.remove(key)
 
 	t.log("Key removed", "remove key from agent")
 
 	t.mu.Unlock()
-
 	t.Resize()
 
 	return err
