@@ -21,7 +21,7 @@
               src = ./.;
 
               vendorHash =
-                "sha256-DEw+3jjClMlWhtwDndd8pXjiEU2//gvd8LLlgWf6KHw=";
+                "sha256-WZlT8qd96u9NVrB98ukTi4ESPw/yXHA6UEtzKvafepU=";
               proxyVendor = true;
 
               nativeBuildInputs = [ pkg-config copyDesktopItems ];
@@ -31,6 +31,7 @@
                 libGLU
                 openssh
                 pkg-config
+                glibc
                 xorg.libXcursor
                 xorg.libXi
                 xorg.libXinerama
@@ -41,7 +42,7 @@
 
               desktopItems = [
                 (makeDesktopItem {
-                  name = "YayAgent";
+                  name = "traygent";
                   exec = pname;
                   icon = pname;
                   desktopName = pname;
@@ -62,6 +63,7 @@
           default = pkgs.mkShell {
             shellHook = ''
               PS1='\u@\h:\@; '
+              export GOEXPERIMENT=loopvar
               nix run github:qbit/xin#flake-warn
               echo "Go `${pkgs.go_1_21}/bin/go version`"
             '';
@@ -72,6 +74,7 @@
               go-tools
 
               glfw
+              glibc
               pkg-config
               xorg.libXcursor
               xorg.libXi

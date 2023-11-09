@@ -11,11 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/theme"
-	"fyne.io/fyne/v2/widget"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
@@ -24,97 +19,42 @@ var errLocked = errors.New("agent is locked")
 
 const expFormat = "Mon Jan 2 15:04:05 MST 2006"
 
-type privKey struct {
-	signer      ssh.Signer
-	comment     string
-	expire      *time.Time
-	pubKey      ssh.PublicKey
-	fingerPrint string
-}
-
-func NewPrivKey(signer ssh.Signer, key agent.AddedKey) privKey {
-	pub := signer.PublicKey()
-	pk := privKey{
-		signer:      signer,
-		comment:     key.Comment,
-		pubKey:      pub,
-		fingerPrint: ssh.FingerprintSHA256(pub),
-	}
-	pk.setExpire(key)
-
-	return pk
-}
-
-func (p *privKey) String() string {
-	pk := p.signer.PublicKey()
-	return fmt.Sprintf("%s %s %s %s",
-		pk.Type(),
-		p.fingerPrint,
-		p.comment,
-		p.expire.Format(expFormat),
-	)
-}
-
-func (p *privKey) GetType() string {
-	return p.pubKey.Type()
-}
-
-func (p *privKey) GetSum() string {
-	return p.fingerPrint
-}
-
-func (p *privKey) GetComment() string {
-	return p.comment
-}
-
-func (p *privKey) setExpire(key agent.AddedKey) {
-	exp := key.LifetimeSecs
-	if exp <= 0 {
-		exp = 300
-	}
-
-	t := time.Now().Add(time.Duration(exp) * time.Second)
-	p.expire = &t
-}
-
 // Traygent extends x/crypto/ssh/agent to hook into fyne for various tasks:
 // - notifications
 // - allowing UI elements to represent keys
 type Traygent struct {
-	app     fyne.App
-	window  fyne.Window
-	keyList *widget.Table
-	desk    desktop.App
-
 	expire   uint32
 	listener net.Listener
 	mu       sync.RWMutex
 
 	keys       []privKey
-	locked     bool
 	passphrase []byte
-}
+	locked     bool
 
-func NewTraygent() agent.Agent {
-	return &Traygent{
-		expire: 360,
-	}
+	addChan chan ssh.PublicKey
+	rmChan  chan string
+	sigReq  chan ssh.PublicKey
+	sigResp chan bool
 }
 
 func (t *Traygent) log(title, msgFmt string, msg ...any) {
-	fmt.Println("log")
 	msgStr := fmt.Sprintf(msgFmt, msg...)
 
 	log.Println(msgStr)
-
-	// TODO: fyne can't send vanishing notifications..
-	//notif := fyne.NewNotification(title, msgStr)
-	//t.app.SendNotification(notif)
 }
 
-func (t *Traygent) remove(key ssh.PublicKey) error {
-	fmt.Println("remove")
+func (t *Traygent) remove(key ssh.PublicKey, reason string) error {
 	hasKey := false
+
+	strReason := ""
+	switch reason {
+	case "expired":
+		strReason = "key expired"
+	case "request":
+		strReason = "user requested key be removed"
+	default:
+		log.Fatalf("unknown removal reason: %q\n", reason)
+	}
 
 	for i := 0; i < len(t.keys); {
 		if bytes.Equal(
@@ -126,7 +66,9 @@ func (t *Traygent) remove(key ssh.PublicKey) error {
 			t.keys[i] = t.keys[len(t.keys)-1]
 			t.keys = t.keys[:len(t.keys)-1]
 
-			t.log("Key removed", "removed key: %q\n", ssh.FingerprintSHA256(key))
+			fp := ssh.FingerprintSHA256(key)
+			t.log("Key removed", "removed key: %q (%s)\n", fp, strReason)
+			go func() { t.rmChan <- fp }()
 
 			continue
 		} else {
@@ -142,20 +84,17 @@ func (t *Traygent) remove(key ssh.PublicKey) error {
 }
 
 func (t *Traygent) RemoveLocked() {
-	fmt.Println("RemoveLocked")
-
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	for _, k := range t.keys {
 		if k.expire != nil && time.Now().After(*k.expire) {
-			t.remove(k.signer.PublicKey())
+			t.remove(k.signer.PublicKey(), "expired")
 		}
 	}
 }
 
 func (t *Traygent) List() ([]*agent.Key, error) {
-	fmt.Println("List")
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -175,79 +114,57 @@ func (t *Traygent) List() ([]*agent.Key, error) {
 	return pubKeys, nil
 }
 
-func (t *Traygent) passphrasePrompt(isLock bool, doneFunc func([]byte)) {
-	fmt.Println("passphrasePrompt")
-	btnStr := "Unlock"
-	titleStr := "Unlock Agent"
-	if isLock {
-		btnStr = "Lock"
-		titleStr = "Lock Agent"
-	}
-	passphrase := widget.NewPasswordEntry()
-	items := []*widget.FormItem{
-		widget.NewFormItem("Passphrase", passphrase),
-	}
-	dialog.ShowForm(titleStr, btnStr, "Cancel", items, func(b bool) {
-		if !b {
-			return
-		}
-
-		doneFunc([]byte(passphrase.Text))
-	}, t.window)
-}
-
-func (t *Traygent) Lock(unused []byte) error {
-	fmt.Println("Lock")
+func (t *Traygent) Lock(passphrase []byte) error {
 	t.log("Agent locked", "locking agent")
 
 	if t.locked {
 		return errLocked
 	}
 
-	t.passphrasePrompt(true, func(passphrase []byte) {
-		t.mu.Lock()
-		defer t.mu.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
-		t.locked = true
-		t.passphrase = passphrase
-
-		t.Resize()
-	})
+	t.passphrase = passphrase
+	t.locked = true
 
 	return nil
 }
 
-func (t *Traygent) Unlock(unused []byte) error {
-	fmt.Println("Unlock")
+func (t *Traygent) Unlock(unusedpassphrase []byte) error {
 	log.Println("unlocking agent")
 
-	if !t.locked {
+	if t.locked {
 		return errors.New("not locked")
 	}
 
-	t.passphrasePrompt(true, func(passphrase []byte) {
-		t.mu.Lock()
-		defer t.mu.Unlock()
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
-		log.Println("hur")
-		if subtle.ConstantTimeCompare(passphrase, t.passphrase) == 1 {
-			t.locked = false
-			t.passphrase = nil
-
-			t.Resize()
-		}
-	})
+	log.Println("hur")
+	if subtle.ConstantTimeCompare(unusedpassphrase, t.passphrase) == 1 {
+		t.passphrase = nil
+		t.locked = false
+	}
 
 	return nil
 }
 
 func (t *Traygent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error) {
-	fmt.Println("Sign")
-	return t.SignWithFlags(key, data, 0)
+	var sig *ssh.Signature
+
+	go func() { t.sigReq <- key }()
+
+	select {
+	case allowed := <-t.sigResp:
+		if allowed {
+			return t.SignWithFlags(key, data, 0)
+		}
+	}
+
+	return sig, fmt.Errorf("not allowed")
 }
 
 func (t *Traygent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.SignatureFlags) (*ssh.Signature, error) {
-	fmt.Println("SignWithFlags")
 	if t.locked {
 		return nil, errLocked
 	}
@@ -284,7 +201,6 @@ func (t *Traygent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Sig
 }
 
 func (t *Traygent) Signers() ([]ssh.Signer, error) {
-	fmt.Println("Signers")
 	log.Println("signers")
 
 	if t.locked {
@@ -305,8 +221,6 @@ func (t *Traygent) Signers() ([]ssh.Signer, error) {
 }
 
 func (t *Traygent) getMaxes() (string, string, string, string) {
-	fmt.Println("getMaxes")
-
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -329,30 +243,7 @@ func (t *Traygent) getMaxes() (string, string, string, string) {
 	return maxType, maxSum, maxComment, expFormat
 }
 
-func (t *Traygent) Resize() {
-	fmt.Println("Resize")
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	maxType, maxFP, maxCmt, maxExp := t.getMaxes()
-
-	typeSize := fyne.MeasureText(maxType, theme.TextSize()+2, fyne.TextStyle{})
-	fpSize := fyne.MeasureText(maxFP, theme.TextSize()+2, fyne.TextStyle{})
-	cmtSize := fyne.MeasureText(maxCmt, theme.TextSize()+2, fyne.TextStyle{})
-	expSize := fyne.MeasureText(maxExp, theme.TextSize()+2, fyne.TextStyle{})
-
-	t.keyList.SetColumnWidth(0, typeSize.Width)
-	t.keyList.SetColumnWidth(1, fpSize.Width)
-	t.keyList.SetColumnWidth(2, cmtSize.Width)
-	t.keyList.SetColumnWidth(3, expSize.Width)
-
-	iconImg := buildImage(len(t.keys), t.locked)
-	t.desk.SetSystemTrayIcon(iconImg)
-}
-
 func (t *Traygent) Add(key agent.AddedKey) error {
-	fmt.Println("Add")
-
 	signer, err := ssh.NewSignerFromKey(key.PrivateKey)
 	if err != nil {
 		return err
@@ -364,44 +255,51 @@ func (t *Traygent) Add(key agent.AddedKey) error {
 	t.keys = append(t.keys, p)
 	t.log("Key added", "added %q to agent", p.fingerPrint)
 
+	go func() { t.addChan <- p.pubKey }()
+
 	t.mu.Unlock()
-	t.Resize()
 
 	return nil
 }
 
 func (t *Traygent) RemoveAll() error {
-	fmt.Println("RemoveAll")
 
 	if t.locked {
 		return errLocked
 	}
 
 	t.mu.Lock()
+	klen := len(t.keys)
 	t.keys = nil
 
-	t.log("All keys removed", "removed all keys from agent")
+	t.log("All keys removed", "removed %d keys from agent", klen)
+	go func() { t.rmChan <- "all" }()
 
 	t.mu.Unlock()
-	t.Resize()
 
 	return nil
 }
 
 func (t *Traygent) Remove(key ssh.PublicKey) error {
-	fmt.Println("Remove")
 
 	if t.locked {
 		return errLocked
 	}
 
 	t.mu.Lock()
-	err := t.remove(key)
+	err := t.remove(key, "request")
 
 	t.log("Key removed", "remove key from agent")
 
 	t.mu.Unlock()
-	t.Resize()
 
 	return err
+}
+
+func NewTraygent() agent.Agent {
+	return &Traygent{
+		expire:  360,
+		addChan: make(chan ssh.PublicKey),
+		rmChan:  make(chan string),
+	}
 }

@@ -42,18 +42,9 @@ func buildImage(length int, locked bool) *myIcon {
 
 	co := color.RGBA{A: 255}
 
-	/*
-		point := fixed.Point26_6{
-			X: fixed.I(size - inconsolata.Regular8x16.Width),
-			Y: fixed.I(size - 1),
-		}
-	*/
-
 	d := &font.Drawer{
-		Dst: i.data,
-		Src: image.NewUniform(co),
-		//Face: inconsolata.Regular8x16,
-		//Dot:  point,
+		Dst:  i.data,
+		Src:  image.NewUniform(co),
 		Face: fontFace,
 		Dot:  fixed.P(2, 10),
 	}
