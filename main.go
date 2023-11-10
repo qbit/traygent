@@ -1,15 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"net/http/pprof"
-	"os"
-	"strings"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -19,6 +15,7 @@ import (
 func main() {
 	dbg := flag.Bool("debug", false, "Enable pprof debugging")
 	sock := flag.String("s", "/tmp/traygent", "Socket path to create")
+	cmdList := flag.String("c", "/etc/traygent.json", "List of commands to execute")
 	flag.Parse()
 
 	if *dbg {
@@ -60,25 +57,36 @@ func main() {
 		}
 	}()
 
+	cmds := LoadCommands(*cmdList)
+
 	for {
 		select {
 		case added := <-tagent.addChan:
-			fmt.Printf("NOTICE: added %q\n", ssh.FingerprintSHA256(added))
-		case rm := <-tagent.rmChan:
-			fmt.Printf("NOTICE: removed %q\n", rm)
-		case pub := <-tagent.sigReq:
-			r := bufio.NewReader(os.Stdin)
-
-			fmt.Printf("NOTICE: Allow access to %q?: ", ssh.FingerprintSHA256(pub))
-			resp, _ := r.ReadString('\n')
-			resp = strings.Trim(resp, "\n")
-
-			if resp == "yes" {
-				go func() { tagent.sigResp <- true }()
-			} else {
-				go func() { tagent.sigResp <- false }()
+			fp := ssh.FingerprintSHA256(added)
+			log.Printf("NOTICE: added %q\n", fp)
+			c := cmds.Get("added")
+			if c != nil {
+				c.Run(fp)
 			}
-			fmt.Printf("%q\n", resp)
+		case rm := <-tagent.rmChan:
+			log.Printf("NOTICE: removed %q\n", rm)
+			c := cmds.Get("removed")
+			if c != nil {
+				c.Run(rm)
+			}
+		case pub := <-tagent.sigReq:
+			fp := ssh.FingerprintSHA256(pub)
+			log.Printf("NOTICE: access request for: %q?\n", fp)
+			c := cmds.Get("sign")
+			if c != nil {
+				if c.Run(fp) {
+					go func() { tagent.sigResp <- true }()
+				} else {
+					go func() { tagent.sigResp <- false }()
+				}
+			} else {
+				panic("nope")
+			}
 		}
 	}
 }
