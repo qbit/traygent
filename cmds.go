@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 type Command struct {
@@ -19,8 +20,11 @@ type Command struct {
 func (c *Command) Run(fp string) bool {
 	cmd := &exec.Cmd{}
 	if len(c.Args) == 0 {
-		cmd = exec.Command(c.Path, fmt.Sprintf(c.MsgFormat, fp))
+		msg := fmt.Sprintf(c.MsgFormat, fp)
+		log.Printf("running %q\n", fmt.Sprintf("%s %s", c.Path, msg))
+		cmd = exec.Command(c.Path, msg)
 	} else {
+		log.Printf("running %q\n", fmt.Sprintf("%s %s", c.Path, strings.Join(c.Args, " ")))
 		cmd = exec.Command(c.Path, c.Args...)
 	}
 
@@ -39,6 +43,7 @@ func (c *Command) Run(fp string) bool {
 		if exit.ExitCode() == c.AllowExitCode {
 			return true
 		}
+		return false
 	}
 
 	return true

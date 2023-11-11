@@ -30,6 +30,8 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	cmds := LoadCommands(*cmdList)
 	tagent := Traygent{
 		listener: l,
 		addChan:  make(chan ssh.PublicKey),
@@ -57,26 +59,21 @@ func main() {
 		}
 	}()
 
-	cmds := LoadCommands(*cmdList)
-
 	for {
 		select {
 		case added := <-tagent.addChan:
 			fp := ssh.FingerprintSHA256(added)
-			log.Printf("NOTICE: added %q\n", fp)
 			c := cmds.Get("added")
 			if c != nil {
 				c.Run(fp)
 			}
 		case rm := <-tagent.rmChan:
-			log.Printf("NOTICE: removed %q\n", rm)
 			c := cmds.Get("removed")
 			if c != nil {
 				c.Run(rm)
 			}
 		case pub := <-tagent.sigReq:
 			fp := ssh.FingerprintSHA256(pub)
-			log.Printf("NOTICE: access request for: %q?\n", fp)
 			c := cmds.Get("sign")
 			if c != nil {
 				if c.Run(fp) {
@@ -84,8 +81,6 @@ func main() {
 				} else {
 					go func() { tagent.sigResp <- false }()
 				}
-			} else {
-				panic("nope")
 			}
 		}
 	}
