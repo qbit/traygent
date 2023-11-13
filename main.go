@@ -4,8 +4,6 @@ import (
 	"flag"
 	"log"
 	"net"
-	"net/http"
-	"net/http/pprof"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -20,18 +18,9 @@ import (
 )
 
 func main() {
-	dbg := flag.Bool("debug", false, "Enable pprof debugging")
 	sock := flag.String("s", "/tmp/traygent", "Socket path to create")
 	cmdList := flag.String("c", "/etc/traygent.json", "List of commands to execute")
 	flag.Parse()
-
-	if *dbg {
-		go func() {
-			mux := http.NewServeMux()
-			mux.HandleFunc("/", pprof.Profile)
-			log.Fatal(http.ListenAndServe(":7777", mux))
-		}()
-	}
 
 	l, err := net.Listen("unix", *sock)
 	if err != nil {
