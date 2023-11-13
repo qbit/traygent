@@ -192,6 +192,7 @@ func (t *Traygent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Sig
 					default:
 						return nil, fmt.Errorf("unsupported signature flags: %d", flags)
 					}
+					k.usage++
 					return algSiger.SignWithAlgorithm(rand.Reader, data, alg)
 				}
 			}
@@ -253,7 +254,7 @@ func (t *Traygent) Add(key agent.AddedKey) error {
 	p := NewPrivKey(signer, key)
 
 	t.keys = append(t.keys, p)
-	t.log("Key added", "added %q to agent", p.fingerPrint)
+	t.log("Key added", "added %q to agent with expiration %d", p.fingerPrint, p.lifetime)
 
 	go func() { t.addChan <- p.pubKey }()
 

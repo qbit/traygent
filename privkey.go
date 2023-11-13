@@ -12,8 +12,10 @@ type privKey struct {
 	signer      ssh.Signer
 	comment     string
 	expire      *time.Time
+	lifetime    uint32
 	pubKey      ssh.PublicKey
 	fingerPrint string
+	usage       uint32
 }
 
 func (p *privKey) String() string {
@@ -45,6 +47,8 @@ func (p *privKey) setExpire(key agent.AddedKey) {
 	}
 
 	t := time.Now().Add(time.Duration(exp) * time.Second)
+	key.LifetimeSecs = exp
+	p.lifetime = key.LifetimeSecs
 	p.expire = &t
 }
 

@@ -72,6 +72,7 @@
               go_1_21
               gopls
               go-tools
+              glxinfo
 
               glfw
               glibc
