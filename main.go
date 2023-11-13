@@ -82,17 +82,19 @@ func main() {
 
 	keyList.ShowHeaderColumn = false
 
-	var lockerButton *widget.Button
-	lockerButton = widget.NewButton("Lock Agent", func() {
-		// TODO: is there a better way?
-		if tagent.locked {
-			tagent.Unlock([]byte(""))
-			lockerButton.SetText("Lock Agent")
-		} else {
-			tagent.Lock([]byte(""))
-			lockerButton.SetText("Unlock Agent")
-		}
-	})
+	/*
+		var lockerButton *widget.Button
+		lockerButton = widget.NewButton("Lock Agent", func() {
+			// TODO: is there a better way?
+			if tagent.locked {
+				tagent.Unlock([]byte(""))
+				lockerButton.SetText("Lock Agent")
+			} else {
+				tagent.Lock([]byte(""))
+				lockerButton.SetText("Unlock Agent")
+			}
+		})
+	*/
 
 	app.SetIcon(buildImage(len(tagent.keys), tagent.locked))
 
@@ -185,7 +187,6 @@ func main() {
 		container.NewBorder(
 			container.New(
 				layout.NewHBoxLayout(),
-				lockerButton,
 				widget.NewButton("Remove Keys", func() {
 					tagent.RemoveAll()
 				}),
