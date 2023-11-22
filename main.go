@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path"
 	"syscall"
 	"time"
 
@@ -16,8 +17,12 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
+func init() {
+	syscall.Umask(0077)
+}
+
 func main() {
-	sock := flag.String("s", "/tmp/traygent", "Socket path to create")
+	sock := flag.String("s", path.Join(os.Getenv("HOME"), ".traygent"), "Socket path to create")
 	cmdList := flag.String("c", "/etc/traygent.json", "List of commands to execute")
 	flag.Parse()
 
@@ -37,8 +42,6 @@ func main() {
 		os.Exit(0)
 	}(sig)
 
-	app := app.NewWithID("traygent")
-
 	cmds := LoadCommands(*cmdList)
 	tagent := Traygent{
 		listener: l,
@@ -48,6 +51,7 @@ func main() {
 		sigResp:  make(chan bool),
 	}
 
+	app := app.NewWithID("traygent")
 	var desk desktop.App
 	var ok bool
 	if desk, ok = app.(desktop.App); ok {
