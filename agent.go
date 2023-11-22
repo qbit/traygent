@@ -154,11 +154,8 @@ func (t *Traygent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error) 
 
 	go func() { t.sigReq <- key }()
 
-	select {
-	case allowed := <-t.sigResp:
-		if allowed {
-			return t.SignWithFlags(key, data, 0)
-		}
+	if <-t.sigResp {
+		return t.SignWithFlags(key, data, 0)
 	}
 
 	return sig, fmt.Errorf("not allowed")
@@ -219,29 +216,6 @@ func (t *Traygent) Signers() ([]ssh.Signer, error) {
 	}
 
 	return signers, nil
-}
-
-func (t *Traygent) getMaxes() (string, string, string, string) {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	maxType := ""
-	maxSum := ""
-	maxComment := ""
-	for _, entry := range t.keys {
-		if len(entry.GetType()) > len(maxType) {
-			maxType = entry.GetType()
-		}
-		if len(entry.GetSum()) > len(maxSum) {
-			maxSum = entry.GetSum()
-		}
-		if len(entry.GetComment()) > len(maxComment) {
-			maxComment = entry.GetComment()
-		}
-
-	}
-
-	return maxType, maxSum, maxComment, expFormat
 }
 
 func (t *Traygent) Add(key agent.AddedKey) error {

@@ -4,15 +4,14 @@ import (
 	"flag"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/theme"
-	"fyne.io/fyne/v2/widget"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
@@ -26,19 +25,19 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer l.Close()
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+
+	go func(c chan os.Signal) {
+		s := <-c
+		log.Printf("caught %q, shutting down...\n", s)
+		os.Remove(*sock)
+		os.Exit(0)
+	}(sig)
 
 	app := app.NewWithID("traygent")
-	window := app.NewWindow("traygent")
-	window.Resize(fyne.NewSize(920, 240))
-
-	ctrlQ := &desktop.CustomShortcut{KeyName: fyne.KeyQ, Modifier: fyne.KeyModifierControl}
-	ctrlW := &desktop.CustomShortcut{KeyName: fyne.KeyW, Modifier: fyne.KeyModifierControl}
-	window.Canvas().AddShortcut(ctrlQ, func(shortcut fyne.Shortcut) {
-		app.Quit()
-	})
-	window.Canvas().AddShortcut(ctrlW, func(shortcut fyne.Shortcut) {
-		window.Hide()
-	})
 
 	cmds := LoadCommands(*cmdList)
 	tagent := Traygent{
@@ -49,90 +48,22 @@ func main() {
 		sigResp:  make(chan bool),
 	}
 
-	keyList := widget.NewTable(
-		// Length
-		func() (int, int) {
-			return len(tagent.keys), 4
-		},
-		// Create
-		func() fyne.CanvasObject {
-			//return widget.NewLabel("")
-			return container.NewStack(widget.NewLabel(""))
-		},
-		// Update
-		func(i widget.TableCellID, o fyne.CanvasObject) {
-			ctnr := o.(*fyne.Container)
-			content := ctnr.Objects[0].(*widget.Label)
-
-			key := tagent.keys[i.Row]
-			pk := key.signer.PublicKey()
-
-			switch i.Col {
-			case 0:
-				content.SetText(pk.Type())
-			case 1:
-				content.SetText(ssh.FingerprintSHA256(pk))
-			case 2:
-				content.SetText(key.comment)
-			case 3:
-				content.SetText(key.expire.Format("Mon Jan 2 15:04:05 MST 2006"))
-			}
-		},
-	)
-
-	keyList.ShowHeaderColumn = false
-
-	/*
-		var lockerButton *widget.Button
-		lockerButton = widget.NewButton("Lock Agent", func() {
-			// TODO: is there a better way?
-			if tagent.locked {
-				tagent.Unlock([]byte(""))
-				lockerButton.SetText("Lock Agent")
-			} else {
-				tagent.Lock([]byte(""))
-				lockerButton.SetText("Unlock Agent")
-			}
-		})
-	*/
-
-	app.SetIcon(buildImage(len(tagent.keys), tagent.locked))
-
 	var desk desktop.App
 	var ok bool
 	if desk, ok = app.(desktop.App); ok {
 		m := fyne.NewMenu("traygent",
-			fyne.NewMenuItem("Show", func() {
-				window.Show()
-			}),
 			fyne.NewMenuItem("Remove Keys", func() {
 				tagent.RemoveAll()
 			}),
 		)
 		desk.SetSystemTrayMenu(m)
 	}
-
-	setInfo := func() {
+	setIcon := func() {
 		iconImg := buildImage(len(tagent.keys), tagent.locked)
-		app.SetIcon(iconImg)
 		desk.SetSystemTrayIcon(iconImg)
-
-		maxType, maxFP, maxCmt, maxExp := tagent.getMaxes()
-
-		typeSize := fyne.MeasureText(maxType, theme.TextSize()+2, fyne.TextStyle{})
-		fpSize := fyne.MeasureText(maxFP, theme.TextSize()+2, fyne.TextStyle{})
-		cmtSize := fyne.MeasureText(maxCmt, theme.TextSize()+2, fyne.TextStyle{})
-		expSize := fyne.MeasureText(maxExp, theme.TextSize()+2, fyne.TextStyle{})
-
-		keyList.SetColumnWidth(0, typeSize.Width)
-		keyList.SetColumnWidth(1, fpSize.Width)
-		keyList.SetColumnWidth(2, cmtSize.Width)
-		keyList.SetColumnWidth(3, expSize.Width)
-
-		keyList.Refresh()
 	}
 
-	setInfo()
+	setIcon()
 
 	go func() {
 		for {
@@ -160,13 +91,13 @@ func main() {
 				fp := ssh.FingerprintSHA256(added)
 				c := cmds.Get("added")
 				if c != nil {
-					setInfo()
+					setIcon()
 					c.Run(fp)
 				}
 			case rm := <-tagent.rmChan:
 				c := cmds.Get("removed")
 				if c != nil {
-					setInfo()
+					setIcon()
 					c.Run(rm)
 				}
 			case pub := <-tagent.sigReq:
@@ -183,19 +114,5 @@ func main() {
 		}
 	}()
 
-	window.SetContent(
-		container.NewBorder(
-			container.New(
-				layout.NewHBoxLayout(),
-				widget.NewButton("Remove Keys", func() {
-					tagent.RemoveAll()
-				}),
-			),
-			nil,
-			nil,
-			nil,
-			keyList,
-		),
-	)
-	window.ShowAndRun()
+	app.Run()
 }
