@@ -26,6 +26,8 @@ func main() {
 	cmdList := flag.String("c", "/etc/traygent.json", "List of commands to execute")
 	flag.Parse()
 
+	os.Remove(*sock)
+
 	l, err := net.Listen("unix", *sock)
 	if err != nil {
 		log.Fatalln(err)

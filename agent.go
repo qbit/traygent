@@ -131,7 +131,6 @@ func (t *Traygent) Lock(passphrase []byte) error {
 }
 
 func (t *Traygent) Unlock(unusedpassphrase []byte) error {
-	log.Println("unlocking agent")
 
 	if t.locked {
 		return errors.New("not locked")
@@ -140,7 +139,6 @@ func (t *Traygent) Unlock(unusedpassphrase []byte) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	log.Println("hur")
 	if subtle.ConstantTimeCompare(unusedpassphrase, t.passphrase) == 1 {
 		t.passphrase = nil
 		t.locked = false
@@ -199,7 +197,6 @@ func (t *Traygent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Sig
 }
 
 func (t *Traygent) Signers() ([]ssh.Signer, error) {
-	log.Println("signers")
 
 	if t.locked {
 		return nil, errLocked

@@ -17,11 +17,11 @@
           traygent = with pkgs;
             buildGo121Module rec {
               pname = "traygent";
-              version = "v0.1.0";
+              version = "v0.1.1";
               src = ./.;
 
               vendorHash =
-                "sha256-/Y6yj2/y9trT7Q68mC5xb7/Q2Nj51eDdTUFJAlrfqIU=";
+                "sha256-Fd4Yh5YHBiCt287I1iffnFtb1zGdU6st62K1ZuWXkvg=";
               proxyVendor = true;
 
               nativeBuildInputs = [ pkg-config copyDesktopItems ];
