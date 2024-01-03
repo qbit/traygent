@@ -15,7 +15,7 @@ import (
 
 var myFont, _ = opentype.Parse(goregular.TTF)
 var fontFace, _ = opentype.NewFace(myFont, &opentype.FaceOptions{
-	Size:    10,
+	Size:    230,
 	DPI:     72,
 	Hinting: font.HintingNone,
 })
@@ -37,7 +37,7 @@ func (m *myIcon) Content() []byte {
 func buildImage(length int, locked bool) *myIcon {
 	i := &myIcon{}
 
-	size := 12
+	size := 256
 	i.data = image.NewRGBA(image.Rect(0, 0, size, size))
 
 	co := color.RGBA{A: 255}
@@ -46,7 +46,7 @@ func buildImage(length int, locked bool) *myIcon {
 		Dst:  i.data,
 		Src:  image.NewUniform(co),
 		Face: fontFace,
-		Dot:  fixed.P(2, 10),
+		Dot:  fixed.P(60, 210),
 	}
 
 	var r []rune
