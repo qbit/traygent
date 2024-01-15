@@ -86,7 +86,7 @@ func main() {
 				continue
 			}
 
-			agent.ServeAgent(&tagent, c)
+			go agent.ServeAgent(&tagent, c)
 		}
 	}()
 

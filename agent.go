@@ -221,9 +221,22 @@ func (t *Traygent) Add(key agent.AddedKey) error {
 		return err
 	}
 
-	t.mu.Lock()
 	p := NewPrivKey(signer, key)
 
+	t.mu.RLock()
+	for _, k := range t.keys {
+		if bytes.Equal(
+			k.signer.PublicKey().Marshal(),
+			signer.PublicKey().Marshal(),
+		) {
+			t.log("Key already added", "key %q already exists in agent with expiration %d", k.fingerPrint, k.lifetime)
+			t.mu.RUnlock()
+			return nil
+		}
+	}
+	t.mu.RUnlock()
+
+	t.mu.Lock()
 	t.keys = append(t.keys, p)
 	t.log("Key added", "added %q to agent with expiration %d", p.fingerPrint, p.lifetime)
 
