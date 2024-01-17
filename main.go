@@ -53,10 +53,15 @@ func main() {
 		sigResp:  make(chan bool),
 	}
 
-	app := app.NewWithID("traygent")
+	trayApp := app.NewWithID("com.bolddaemon.traygent")
+
+	app.SetMetadata(fyne.AppMetadata{
+		Name: "traygent",
+	})
+
 	var desk desktop.App
 	var ok bool
-	if desk, ok = app.(desktop.App); ok {
+	if desk, ok = trayApp.(desktop.App); ok {
 		m := fyne.NewMenu("traygent",
 			fyne.NewMenuItem("Remove Keys", func() {
 				tagent.RemoveAll()
@@ -120,5 +125,5 @@ func main() {
 		}
 	}()
 
-	app.Run()
+	trayApp.Run()
 }
