@@ -1,0 +1,30 @@
+[
+  {
+    "command_path": "/bin/ssh-askpass-fullscreen",
+    "event": "sign",
+    "exit_code": 0,
+    "msg_format": "Allow access to key %q?"
+  },
+  {
+    "command_args": [
+      "--title",
+      "traygent",
+      "--passivepopup",
+      "SSH Key Added",
+      "5"
+    ],
+    "command_path": "/bin/kdialog",
+    "event": "added"
+  },
+  {
+    "command_args": [
+      "--title",
+      "traygent",
+      "--passivepopup",
+      "SSH Key Removed",
+      "5"
+    ],
+    "command_path": "/bin/kdialog",
+    "event": "removed"
+  }
+]
