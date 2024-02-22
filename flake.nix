@@ -17,7 +17,7 @@
           traygent = with pkgs;
             buildGo121Module rec {
               pname = "traygent";
-              version = "v1.0.1";
+              version = "v1.0.2";
               src = ./.;
 
               vendorHash =
