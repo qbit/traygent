@@ -88,7 +88,14 @@ func (t *Traygent) RemoveLocked() {
 	defer t.mu.Unlock()
 
 	for _, k := range t.keys {
-		if k.expire != nil && time.Now().After(*k.expire) {
+		now := time.Now()
+
+		// Without Round(0) when coming out of S3 suspend the After check below fails
+		// https://github.com/golang/go/issues/36141
+		now = now.Round(0)
+		k.expireTime.Round(0)
+
+		if k.expireTime != nil && now.After(*k.expireTime) {
 			t.remove(k.signer.PublicKey(), "expired")
 		}
 	}
@@ -106,7 +113,7 @@ func (t *Traygent) List() ([]*agent.Key, error) {
 	for _, k := range t.keys {
 		pubKeys = append(pubKeys, &agent.Key{
 			Blob:    k.pubKey.Marshal(),
-			Comment: fmt.Sprintf("%s [%s]", k.comment, k.expire.Format(expFormat)),
+			Comment: fmt.Sprintf("%s [%s]", k.comment, k.expireTime.Format(expFormat)),
 			Format:  k.pubKey.Type(),
 		})
 	}

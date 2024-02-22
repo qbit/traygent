@@ -11,7 +11,7 @@ import (
 type privKey struct {
 	signer      ssh.Signer
 	comment     string
-	expire      *time.Time
+	expireTime  *time.Time
 	lifetime    uint32
 	pubKey      ssh.PublicKey
 	fingerPrint string
@@ -24,7 +24,7 @@ func (p *privKey) String() string {
 		pk.Type(),
 		p.fingerPrint,
 		p.comment,
-		p.expire.Format(expFormat),
+		p.expireTime.Format(expFormat),
 	)
 }
 
@@ -49,7 +49,7 @@ func (p *privKey) setExpire(key agent.AddedKey) {
 	t := time.Now().Add(time.Duration(exp) * time.Second)
 	key.LifetimeSecs = exp
 	p.lifetime = key.LifetimeSecs
-	p.expire = &t
+	p.expireTime = &t
 }
 
 func NewPrivKey(signer ssh.Signer, key agent.AddedKey) privKey {
