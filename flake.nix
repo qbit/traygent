@@ -15,13 +15,13 @@
 
         in {
           traygent = with pkgs;
-            buildGo121Module rec {
+            buildGoModule rec {
               pname = "traygent";
-              version = "v1.0.3";
+              version = "v1.0.4";
               src = ./.;
 
               vendorHash =
-                "sha256-BHVHqgjLQR84DkIZ4WAoA6Pe6Ib5ebsWK6/w3ooA3CI=";
+                "sha256-RUCnUUT/PGeQesMMtmh2RXXlOxBLkCd49qGF8bF5+cw=";
               proxyVendor = true;
 
               nativeBuildInputs = [ pkg-config copyDesktopItems ];
@@ -65,11 +65,11 @@
               PS1='\u@\h:\@; '
               export GOEXPERIMENT=loopvar
               nix run github:qbit/xin#flake-warn
-              echo "Go `${pkgs.go_1_21}/bin/go version`"
+              echo "Go `${pkgs.go}/bin/go version`"
             '';
             buildInputs = with pkgs; [
               git
-              go_1_21
+              go
               gopls
               go-tools
               glxinfo
