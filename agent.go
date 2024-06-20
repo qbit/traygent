@@ -31,13 +31,15 @@ type Traygent struct {
 	passphrase []byte
 	locked     bool
 
-	addChan chan ssh.PublicKey
-	rmChan  chan string
-	sigReq  chan ssh.PublicKey
-	sigResp chan bool
+	addChan       chan ssh.PublicKey
+	rmChan        chan string
+	sigReq        chan ssh.PublicKey
+	sigResp       chan bool
+	force         bool
+	forceDuration int
 }
 
-func (t *Traygent) log(title, msgFmt string, msg ...any) {
+func (t *Traygent) log(_, msgFmt string, msg ...any) {
 	msgStr := fmt.Sprintf(msgFmt, msg...)
 
 	log.Println(msgStr)
@@ -92,11 +94,13 @@ func (t *Traygent) RemoveLocked() {
 
 		// Without Round(0) when coming out of S3 suspend the After check below fails
 		// https://github.com/golang/go/issues/36141
-		now = now.Round(0)
-		k.expireTime.Round(0)
+		if k.expireTime != nil {
+			now = now.Round(0)
+			k.expireTime.Round(0)
 
-		if k.expireTime != nil && now.After(*k.expireTime) {
-			t.remove(k.signer.PublicKey(), "expired")
+			if k.expireTime != nil && now.After(*k.expireTime) {
+				t.remove(k.signer.PublicKey(), "expired")
+			}
 		}
 	}
 }
@@ -111,9 +115,15 @@ func (t *Traygent) List() ([]*agent.Key, error) {
 	}
 
 	for _, k := range t.keys {
+		comment := ""
+		if k.expireTime != nil {
+			comment = fmt.Sprintf("%s [%s]", k.comment, k.expireTime.Format(expFormat))
+		} else {
+			comment = k.comment
+		}
 		pubKeys = append(pubKeys, &agent.Key{
 			Blob:    k.pubKey.Marshal(),
-			Comment: fmt.Sprintf("%s [%s]", k.comment, k.expireTime.Format(expFormat)),
+			Comment: comment,
 			Format:  k.pubKey.Type(),
 		})
 	}
@@ -228,7 +238,7 @@ func (t *Traygent) Add(key agent.AddedKey) error {
 		return err
 	}
 
-	p := NewPrivKey(signer, key)
+	p := NewPrivKey(signer, key, t.force, t.forceDuration)
 
 	t.mu.RLock()
 	for _, k := range t.keys {
