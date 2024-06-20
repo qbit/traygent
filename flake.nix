@@ -73,6 +73,7 @@
               gopls
               go-tools
               glxinfo
+              nilaway
 
               glfw
               glibc
