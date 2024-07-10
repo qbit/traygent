@@ -17,11 +17,10 @@
           traygent = with pkgs;
             buildGoModule rec {
               pname = "traygent";
-              version = "v1.0.5";
+              version = "v1.0.6";
               src = ./.;
 
-              vendorHash =
-                "sha256-dIxyBHnQzPSNJqNpDFJy1G2ke1txH86mcFF5ubzyUkA=";
+              vendorHash = "sha256-knT0sQOe7DNQl5gVrdoi7czgTJqO7jUU6ZWl1qT9d/U=";
 
               proxyVendor = true;
 
