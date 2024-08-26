@@ -1,0 +1,7 @@
+Website = "https://github.com/qbit/traygent"
+
+[Details]
+  Icon = "traygent.png"
+  Name = "traygent"
+  ID = "dev.suah.traygent"
+  Version = "1.0.8"

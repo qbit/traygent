@@ -17,15 +17,16 @@
           traygent = with pkgs;
             buildGoModule rec {
               pname = "traygent";
-              version = "v1.0.7";
+              version = "v1.0.8";
               src = ./.;
 
-              vendorHash = "sha256-rfNq9VbrNB5Mw0AccCzQB4B798H9XeTqM/XDs0Ycjgk=";
+              vendorHash = "sha256-rYLUBRX0m9sCihu6EhakiC1jAzp6NAY7oLaSSKwNqhU=";
 
               proxyVendor = true;
 
               nativeBuildInputs = [ pkg-config copyDesktopItems ];
               buildInputs = [
+                fyne
                 glfw
                 libGL
                 libGLU
@@ -38,21 +39,22 @@
                 xorg.libXrandr
                 xorg.libXxf86vm
                 xorg.xinput
+
+                wayland
+                libxkbcommon
               ];
 
-              desktopItems = [
-                (makeDesktopItem {
-                  name = "traygent";
-                  exec = pname;
-                  icon = pname;
-                  desktopName = pname;
-                })
-              ];
+              # No wayland yet, it opens a second window
+              buildPhase = ''
+                ${fyne}/bin/fyne package
+              '';
 
-              #postInstall = ''
-              #  mkdir -p $out/share/
-              #  cp -r icons $out/share/
-              #'';
+              installPhase = ''
+                mkdir -p $out
+                pkg="$PWD/${pname}.tar.xz"
+                cd $out
+                tar --strip-components=1 -xvf $pkg
+              '';
             };
         });
 
@@ -68,6 +70,7 @@
               echo "Go `${pkgs.go}/bin/go version`"
             '';
             buildInputs = with pkgs; [
+              fyne
               git
               go
               gopls
@@ -85,6 +88,9 @@
               xorg.libXxf86vm
               xorg.xinput
               graphviz
+
+              wayland
+              libxkbcommon
 
               go-font
             ];
