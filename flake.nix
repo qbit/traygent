@@ -19,7 +19,7 @@
           traygent = with pkgs;
             buildGoModule rec {
               pname = "traygent";
-              version = "v${verStr}";
+              version = verStr.Details.Version;
               src = ./.;
 
               vendorHash = "sha256-rYLUBRX0m9sCihu6EhakiC1jAzp6NAY7oLaSSKwNqhU=";
