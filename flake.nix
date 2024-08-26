@@ -5,6 +5,8 @@
 
   outputs = { self, nixpkgs }:
     let
+      inherit (builtins) readFile fromTOML;
+      verStr = fromTOML (readFile ./FyneApp.toml);
       supportedSystems =
         [ "x86_64-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -17,7 +19,7 @@
           traygent = with pkgs;
             buildGoModule rec {
               pname = "traygent";
-              version = "v1.0.8";
+              version = "v${verStr}";
               src = ./.;
 
               vendorHash = "sha256-rYLUBRX0m9sCihu6EhakiC1jAzp6NAY7oLaSSKwNqhU=";
@@ -46,7 +48,7 @@
 
               # No wayland yet, it opens a second window
               buildPhase = ''
-                ${fyne}/bin/fyne package
+                ${fyne}/bin/fyne package --release
               '';
 
               installPhase = ''

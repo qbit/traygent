@@ -5,3 +5,4 @@ Website = "https://github.com/qbit/traygent"
   Name = "traygent"
   ID = "dev.suah.traygent"
   Version = "1.0.8"
+  Build = 1
