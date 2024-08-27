@@ -24,8 +24,6 @@ func init() {
 func main() {
 	sock := flag.String("s", path.Join(os.Getenv("HOME"), ".traygent"), "Socket path to create")
 	cmdList := flag.String("c", "/etc/traygent.json", "List of commands to execute")
-	force := flag.Bool("f", true, "force expiration of keys")
-	forceDuration := flag.Int("d", 300, "seconds for forced expiration")
 	flag.Parse()
 
 	os.Remove(*sock)
@@ -48,13 +46,11 @@ func main() {
 
 	cmds := LoadCommands(*cmdList)
 	tagent := Traygent{
-		listener:      l,
-		addChan:       make(chan ssh.PublicKey),
-		rmChan:        make(chan string),
-		sigReq:        make(chan ssh.PublicKey),
-		sigResp:       make(chan bool),
-		force:         *force,
-		forceDuration: *forceDuration,
+		listener: l,
+		addChan:  make(chan ssh.PublicKey),
+		rmChan:   make(chan string),
+		sigReq:   make(chan ssh.PublicKey),
+		sigResp:  make(chan bool),
 	}
 
 	trayApp := app.NewWithID("com.bolddaemon.traygent")

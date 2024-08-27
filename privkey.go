@@ -40,22 +40,18 @@ func (p *privKey) GetComment() string {
 	return p.comment
 }
 
-func (p *privKey) setExpire(key agent.AddedKey, force bool, duration int) {
+func (p *privKey) setExpire(key agent.AddedKey) {
 	exp := key.LifetimeSecs
 
-	if force && exp <= 0 {
-		exp = uint32(duration)
-	}
-
 	t := time.Now().Add(time.Duration(exp) * time.Second)
-	key.LifetimeSecs = exp
 	p.lifetime = key.LifetimeSecs
+
 	if exp > 0 {
 		p.expireTime = &t
 	}
 }
 
-func NewPrivKey(signer ssh.Signer, key agent.AddedKey, force bool, duration int) privKey {
+func NewPrivKey(signer ssh.Signer, key agent.AddedKey) privKey {
 	pub := signer.PublicKey()
 	pk := privKey{
 		signer:      signer,
@@ -63,7 +59,7 @@ func NewPrivKey(signer ssh.Signer, key agent.AddedKey, force bool, duration int)
 		pubKey:      pub,
 		fingerPrint: ssh.FingerprintSHA256(pub),
 	}
-	pk.setExpire(key, force, duration)
+	pk.setExpire(key)
 
 	return pk
 }

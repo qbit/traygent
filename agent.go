@@ -31,12 +31,10 @@ type Traygent struct {
 	passphrase []byte
 	locked     bool
 
-	addChan       chan ssh.PublicKey
-	rmChan        chan string
-	sigReq        chan ssh.PublicKey
-	sigResp       chan bool
-	force         bool
-	forceDuration int
+	addChan chan ssh.PublicKey
+	rmChan  chan string
+	sigReq  chan ssh.PublicKey
+	sigResp chan bool
 }
 
 func (t *Traygent) log(_, msgFmt string, msg ...any) {
@@ -238,7 +236,7 @@ func (t *Traygent) Add(key agent.AddedKey) error {
 		return err
 	}
 
-	p := NewPrivKey(signer, key, t.force, t.forceDuration)
+	p := NewPrivKey(signer, key)
 
 	t.mu.RLock()
 	for _, k := range t.keys {
