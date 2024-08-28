@@ -268,14 +268,16 @@ func (t *Traygent) RemoveAll() error {
 		return errLocked
 	}
 
-	t.mu.Lock()
-	klen := len(t.keys)
-	t.keys = nil
+	if len(t.keys) > 0 {
+		t.mu.Lock()
+		klen := len(t.keys)
+		t.keys = nil
 
-	t.log("All keys removed", "removed %d keys from agent", klen)
-	go func() { t.rmChan <- "all" }()
+		t.log("All keys removed", "removed %d keys from agent", klen)
+		go func() { t.rmChan <- "all" }()
 
-	t.mu.Unlock()
+		t.mu.Unlock()
+	}
 
 	return nil
 }
