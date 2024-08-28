@@ -4,6 +4,6 @@ Website = "https://github.com/qbit/traygent"
   Icon = "traygent.png"
   Name = "traygent"
   ID = "dev.suah.traygent"
-  Version = "1.1.0"
+  Version = "1.1.1"
   Build = 1
 
