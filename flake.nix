@@ -5,8 +5,6 @@
 
   outputs = { self, nixpkgs }:
     let
-      inherit (builtins) readFile fromTOML;
-      verStr = fromTOML (readFile ./FyneApp.toml);
       supportedSystems =
         [ "x86_64-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -19,10 +17,10 @@
           traygent = with pkgs;
             buildGoModule rec {
               pname = "traygent";
-              version = verStr.Details.Version;
+              version = "v1.1.2";
               src = ./.;
 
-              vendorHash = "sha256-rYLUBRX0m9sCihu6EhakiC1jAzp6NAY7oLaSSKwNqhU=";
+              vendorHash = "sha256-dH7ALIczbfP8Grk6BW5RsZeM+kmFgKmvU6ZUmU7/PJg=";
 
               proxyVendor = true;
 
