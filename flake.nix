@@ -3,28 +3,41 @@
 
   inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { self, nixpkgs }:
     let
-      supportedSystems =
-        [ "x86_64-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin" ];
+      supportedSystems = [
+        "x86_64-linux"
+        "x86_64-darwin"
+        "aarch64-linux"
+        "aarch64-darwin"
+      ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
       nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
-    in {
-      packages = forAllSystems (system:
-        let pkgs = nixpkgsFor.${system};
+    in
+    {
+      packages = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgsFor.${system};
 
-        in {
-          traygent = with pkgs;
+        in
+        {
+          traygent =
+            with pkgs;
             buildGoModule rec {
               pname = "traygent";
               version = "v1.1.3";
               src = ./.;
 
-              vendorHash = "sha256-tX/D/CJ+Fr+DkTKlHv4UxlRSwaBsOrr7buPp4Q3ypFU=";
+              vendorHash = "sha256-9/rlBFdSamZvGnIeWaYWhrf4eMMf9A1/iPDn3NF/4bw=";
 
               proxyVendor = true;
 
-              nativeBuildInputs = [ pkg-config copyDesktopItems ];
+              nativeBuildInputs = [
+                pkg-config
+                copyDesktopItems
+              ];
               buildInputs = [
                 fyne
                 glfw
@@ -56,12 +69,16 @@
                 tar --strip-components=1 -xvf $pkg
               '';
             };
-        });
+        }
+      );
 
       defaultPackage = forAllSystems (system: self.packages.${system}.traygent);
-      devShells = forAllSystems (system:
-        let pkgs = nixpkgsFor.${system};
-        in {
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgsFor.${system};
+        in
+        {
           default = pkgs.mkShell {
             shellHook = ''
               PS1='\u@\h:\@; '
@@ -75,8 +92,10 @@
               go
               gopls
               go-tools
-              glxinfo
+              mesa-demos
               nilaway
+              kdePackages.kdialog
+              ssh-askpass-fullscreen
 
               glfw
               glibc
@@ -91,11 +110,12 @@
 
               wayland
               libxkbcommon
-
+              libxdmcp
+              libxcb
               go-font
             ];
           };
-        });
+        }
+      );
     };
 }
-
