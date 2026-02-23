@@ -15,7 +15,11 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 )
 
-var errLocked = errors.New("agent is locked")
+var (
+	errLocked      = errors.New("agent is locked")
+	errKeyNotFound = errors.New("key not found")
+	errNotAllowed  = errors.New("not allowed")
+)
 
 const expFormat = "Mon Jan 2 15:04:05 MST 2006"
 
@@ -35,6 +39,8 @@ type Traygent struct {
 	rmChan  chan string
 	sigReq  chan ssh.PublicKey
 	sigResp chan bool
+
+	externalAgents []agent.Agent
 }
 
 func (t *Traygent) log(_, msgFmt string, msg ...any) {
@@ -77,7 +83,7 @@ func (t *Traygent) remove(key ssh.PublicKey, reason string) error {
 	}
 
 	if !hasKey {
-		return errors.New("key not found")
+		return errKeyNotFound
 	}
 
 	return nil
@@ -126,6 +132,15 @@ func (t *Traygent) List() ([]*agent.Key, error) {
 		})
 	}
 
+	// Add the external agents lists to our own
+	for _, ag := range t.externalAgents {
+		keys, err := ag.List()
+		if err != nil {
+			continue
+		}
+		pubKeys = append(pubKeys, keys...)
+	}
+
 	return pubKeys, nil
 }
 
@@ -168,10 +183,21 @@ func (t *Traygent) Sign(key ssh.PublicKey, data []byte) (*ssh.Signature, error) 
 	go func() { t.sigReq <- key }()
 
 	if <-t.sigResp {
-		return t.SignWithFlags(key, data, 0)
+		sig, err := t.SignWithFlags(key, data, 0)
+		if err == nil {
+			return sig, nil
+		}
+
+		// continue on and check in with the other externalAgents
+		for _, ag := range t.externalAgents {
+			sig, err = ag.Sign(key, data)
+			if err == nil {
+				return sig, nil
+			}
+		}
 	}
 
-	return sig, fmt.Errorf("not allowed")
+	return sig, errNotAllowed
 }
 
 func (t *Traygent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.SignatureFlags) (*ssh.Signature, error) {
@@ -185,6 +211,7 @@ func (t *Traygent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Sig
 	defer t.mu.Unlock()
 
 	pk := key.Marshal()
+
 	for _, k := range t.keys {
 		if bytes.Equal(k.signer.PublicKey().Marshal(), pk) {
 			if flags == 0 {
@@ -208,7 +235,8 @@ func (t *Traygent) SignWithFlags(key ssh.PublicKey, data []byte, flags agent.Sig
 			}
 		}
 	}
-	return nil, errors.New("not found")
+
+	return nil, errKeyNotFound
 }
 
 func (t *Traygent) Signers() ([]ssh.Signer, error) {
@@ -225,6 +253,14 @@ func (t *Traygent) Signers() ([]ssh.Signer, error) {
 	signers := make([]ssh.Signer, 0, len(t.keys))
 	for _, k := range t.keys {
 		signers = append(signers, k.signer)
+	}
+
+	for _, ag := range t.externalAgents {
+		sigs, err := ag.Signers()
+		if err != nil {
+			continue
+		}
+		signers = append(signers, sigs...)
 	}
 
 	return signers, nil
@@ -279,6 +315,13 @@ func (t *Traygent) RemoveAll() error {
 		t.mu.Unlock()
 	}
 
+	for _, ag := range t.externalAgents {
+		err := ag.RemoveAll()
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -290,12 +333,22 @@ func (t *Traygent) Remove(key ssh.PublicKey) error {
 
 	t.mu.Lock()
 	err := t.remove(key, "request")
+	if err != nil {
+		log.Println(err)
+	}
+
+	for _, ag := range t.externalAgents {
+		err = ag.Remove(key)
+		if err != nil {
+			log.Println(err)
+		}
+	}
 
 	t.log("Key removed", "remove key from agent")
 
 	t.mu.Unlock()
 
-	return err
+	return nil
 }
 
 func NewTraygent() agent.Agent {

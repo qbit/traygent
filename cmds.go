@@ -15,6 +15,7 @@ type Command struct {
 	AllowExitCode int      `json:"exit_code"`
 	Event         string   `json:"event"`
 	MsgFormat     string   `json:"msg_format"`
+	ExtraAgents   []string `json:"extra_agents"`
 }
 
 func (c *Command) Run(fp string) bool {
@@ -49,10 +50,13 @@ func (c *Command) Run(fp string) bool {
 	return true
 }
 
-type Commands []Command
+type Config struct {
+	Commands    []Command `json:"commands"`
+	ExtraAgents []string  `json:"extra_agents"`
+}
 
-func (cs Commands) Get(event string) *Command {
-	for _, c := range cs {
+func (cs Config) Get(event string) *Command {
+	for _, c := range cs.Commands {
 		if c.Event == event {
 			return &c
 		}
@@ -60,8 +64,8 @@ func (cs Commands) Get(event string) *Command {
 	return nil
 }
 
-func LoadCommands(p string) Commands {
-	cmds := Commands{}
+func LoadConfig(p string) Config {
+	cmds := Config{}
 	data, err := os.ReadFile(p)
 	if err != nil {
 		log.Fatal(err)

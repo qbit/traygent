@@ -44,7 +44,7 @@ func main() {
 		os.Exit(0)
 	}(sig)
 
-	cmds := LoadCommands(*cmdList)
+	cfg := LoadConfig(*cmdList)
 	tagent := Traygent{
 		listener: l,
 		addChan:  make(chan ssh.PublicKey),
@@ -83,6 +83,19 @@ func main() {
 		}
 	}()
 
+	// Create connections to the external agents
+	for _, agentSock := range cfg.ExtraAgents {
+		conn, err := net.Dial("unix", agentSock)
+		if err != nil {
+			log.Fatalf("Failed to open SSH_AUTH_SOCK: %v", err)
+		}
+
+		defer conn.Close()
+
+		client := agent.NewClient(conn)
+		tagent.externalAgents = append(tagent.externalAgents, client)
+	}
+
 	go func() {
 		for {
 			c, err := tagent.listener.Accept()
@@ -100,20 +113,20 @@ func main() {
 			select {
 			case added := <-tagent.addChan:
 				fp := ssh.FingerprintSHA256(added)
-				c := cmds.Get("added")
+				c := cfg.Get("added")
 				if c != nil {
 					setIcon()
 					c.Run(fp)
 				}
 			case rm := <-tagent.rmChan:
-				c := cmds.Get("removed")
+				c := cfg.Get("removed")
 				if c != nil {
 					setIcon()
 					c.Run(rm)
 				}
 			case pub := <-tagent.sigReq:
 				fp := ssh.FingerprintSHA256(pub)
-				c := cmds.Get("sign")
+				c := cfg.Get("sign")
 				if c != nil {
 					if c.Run(fp) {
 						go func() { tagent.sigResp <- true }()
