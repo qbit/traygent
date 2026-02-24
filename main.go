@@ -59,6 +59,25 @@ func main() {
 		Name: "traygent",
 	})
 
+	// Create connections to the external agents
+	connectExternalAgents := func() {
+		tagent.mu.Lock()
+		defer tagent.mu.Unlock()
+
+		tagent.externalAgents = []agent.Agent{}
+		for _, agentSock := range cfg.ExtraAgents {
+			log.Printf("creating a connection for %q", agentSock)
+			conn, err := net.Dial("unix", agentSock)
+			if err != nil {
+				log.Printf("Failed to open SSH_AUTH_SOCK: %v .. skipping", err)
+				continue
+			}
+
+			client := agent.NewClient(conn)
+			tagent.externalAgents = append(tagent.externalAgents, client)
+		}
+	}
+
 	var desk desktop.App
 	var ok bool
 	if desk, ok = trayApp.(desktop.App); ok {
@@ -66,11 +85,18 @@ func main() {
 			fyne.NewMenuItem("Remove Keys", func() {
 				tagent.RemoveAll()
 			}),
+			fyne.NewMenuItem("Connect external agents", func() {
+				connectExternalAgents()
+			}),
 		)
 		desk.SetSystemTrayMenu(m)
 	}
 	setIcon := func() {
-		iconImg := buildImage(len(tagent.keys), tagent.locked)
+		keys, err := tagent.List()
+		if err != nil {
+			return
+		}
+		iconImg := buildImage(len(keys), tagent.locked)
 		desk.SetSystemTrayIcon(iconImg)
 	}
 
@@ -83,24 +109,12 @@ func main() {
 		}
 	}()
 
-	// Create connections to the external agents
-	for _, agentSock := range cfg.ExtraAgents {
-		conn, err := net.Dial("unix", agentSock)
-		if err != nil {
-			log.Fatalf("Failed to open SSH_AUTH_SOCK: %v", err)
-		}
-
-		defer conn.Close()
-
-		client := agent.NewClient(conn)
-		tagent.externalAgents = append(tagent.externalAgents, client)
-	}
+	connectExternalAgents()
 
 	go func() {
 		for {
 			c, err := tagent.listener.Accept()
 			if err != nil {
-				log.Println(err)
 				continue
 			}
 
